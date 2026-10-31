@@ -1,0 +1,73 @@
+name: Build Prism CUDA server image
+
+on:
+  push:
+    branches:
+      - docker
+    paths:
+      - '.devops/cuda.Dockerfile'
+      - '.dockerignore'
+      - '**/CMakeLists.txt'
+      - '**/*.c'
+      - '**/*.cc'
+      - '**/*.cpp'
+      - '**/*.cu'
+      - '**/*.h'
+      - '**/*.hpp'
+      - '**/*.cuh'
+      - '.github/workflows/prism-cuda-server.yml'
+  pull_request:
+    paths:
+      - '.devops/cuda.Dockerfile'
+      - '.dockerignore'
+      - '**/CMakeLists.txt'
+      - '**/*.c'
+      - '**/*.cc'
+      - '**/*.cpp'
+      - '**/*.cu'
+      - '**/*.h'
+      - '**/*.hpp'
+      - '**/*.cuh'
+      - '.github/workflows/prism-cuda-server.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prism-cuda-server-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-server:
+    name: Build CUDA server image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .devops/cuda.Dockerfile
+          target: server
+          platforms: linux/amd64
+          tags: prism-llamacpp:server-ci
+          load: true
+          push: false
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Inspect built image
+        run: |
+          set -euo pipefail
+          docker image inspect prism-llamacpp:server-ci
+          docker image inspect prism-llamacpp:server-ci \
+            --format 'entrypoint={{json .Config.Entrypoint}} workdir={{.Config.WorkingDir}}'
