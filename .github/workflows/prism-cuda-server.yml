@@ -47,7 +47,10 @@ jobs:
   build-server:
     name: Build and publish CUDA ${{ matrix.cuda_major }} server image
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    # GitHub-hosted runners enforce a hard six-hour job limit. A 24-hour
+    # timeout requires a configured self-hosted runner; this is the maximum
+    # effective timeout for the current ubuntu-24.04 hosted runner.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
