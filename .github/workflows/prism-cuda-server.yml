@@ -1,4 +1,4 @@
-name: Build Prism CUDA server image
+name: Build and publish Prism CUDA server images
 
 on:
   push:
@@ -33,6 +33,11 @@ on:
 
 permissions:
   contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/abhishekthecoderx/prism-llama.cpp-docker
 
 concurrency:
   group: prism-cuda-server-${{ github.workflow }}-${{ github.ref }}
@@ -40,11 +45,19 @@ concurrency:
 
 jobs:
   build-server:
-    name: Build CUDA server image
+    name: Build and publish CUDA ${{ matrix.cuda_major }} server image
     runs-on: ubuntu-24.04
-    # CUDA compilation is CPU-bound on the hosted runner; keep enough time
-    # for a cold build while limiting the build to the L4 architecture below.
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cuda_major: '12'
+            cuda_version: '12.9.1'
+            image_tag: server-cuda12
+          - cuda_major: '13'
+            cuda_version: '13.3.0'
+            image_tag: server-cuda13
 
     steps:
       - name: Check out repository
@@ -53,26 +66,40 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build server image
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish server image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: .devops/cuda.Dockerfile
           target: server
           platforms: linux/amd64
-          tags: prism-llamacpp:server-ci
-          load: true
-          push: false
+          push: ${{ github.event_name != 'pull_request' }}
           provenance: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=server-cuda${{ matrix.cuda_major }}
+          cache-to: type=gha,mode=max,scope=server-cuda${{ matrix.cuda_major }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ matrix.image_tag }}
+            ${{ env.IMAGE_NAME }}:${{ matrix.image_tag }}-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Prism llama.cpp CUDA ${{ matrix.cuda_major }} server
           build-args: |
+            CUDA_VERSION=${{ matrix.cuda_version }}
             CUDA_DOCKER_ARCH=89-real
             GGML_CPU_ALL_VARIANTS=OFF
 
-      - name: Inspect built image
+      - name: Verify published image manifest
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
-          docker image inspect prism-llamacpp:server-ci
-          docker image inspect prism-llamacpp:server-ci \
-            --format 'entrypoint={{json .Config.Entrypoint}} workdir={{.Config.WorkingDir}}'
+          docker buildx imagetools inspect "${IMAGE_NAME}:${{ matrix.image_tag }}"
+          docker buildx imagetools inspect "${IMAGE_NAME}:${{ matrix.image_tag }}-${{ github.sha }}"
