@@ -42,7 +42,9 @@ jobs:
   build-server:
     name: Build CUDA server image
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # CUDA compilation is CPU-bound on the hosted runner; keep enough time
+    # for a cold build while limiting the build to the L4 architecture below.
+    timeout-minutes: 180
 
     steps:
       - name: Check out repository
@@ -65,7 +67,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            CUDA_DOCKER_ARCH=89
+            CUDA_DOCKER_ARCH=89-real
             GGML_CPU_ALL_VARIANTS=OFF
 
       - name: Inspect built image
