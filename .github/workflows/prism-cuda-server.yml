@@ -54,9 +54,11 @@ jobs:
         include:
           - cuda_major: '12'
             cuda_version: '12.9.1'
+            cuda_arch: non-blackwell
             image_tag: server-cuda12
           - cuda_major: '13'
             cuda_version: '13.3.0'
+            cuda_arch: non-blackwell
             image_tag: server-cuda13
 
     steps:
@@ -94,7 +96,7 @@ jobs:
             org.opencontainers.image.title=Prism llama.cpp CUDA ${{ matrix.cuda_major }} server
           build-args: |
             CUDA_VERSION=${{ matrix.cuda_version }}
-            CUDA_DOCKER_ARCH=89-real
+            CUDA_DOCKER_ARCH=${{ matrix.cuda_arch }}
             GGML_CPU_ALL_VARIANTS=OFF
 
       - name: Verify published image manifest

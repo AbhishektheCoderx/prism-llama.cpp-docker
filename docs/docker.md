@@ -38,7 +38,22 @@ Additionally, there the following images, similar to the above:
 - `ghcr.io/ggml-org/llama.cpp:light-s390x`: Identical to `light`, an alias for the `s390x` platform. (platforms: `linux/s390x`)
 - `ghcr.io/ggml-org/llama.cpp:server-s390x`: Identical to `server`, an alias for the `s390x` platform. (platforms: `linux/s390x`)
 
-The GPU enabled images are not currently tested by CI beyond being built. They are not built with any variation from the ones in the Dockerfiles defined in [.devops/](../.devops/) and the GitHub Action defined in [.github/workflows/docker.yml](../.github/workflows/docker.yml). If you need different settings (for example, a different CUDA, ROCm or MUSA library, you'll need to build the images locally for now).
+The GPU enabled images are built by the dedicated `prism-cuda-server.yml`
+workflow. The published Prism CUDA server images use a non-Blackwell CUDA
+architecture policy so one image can run across the supported pre-Blackwell
+NVIDIA GPU families:
+
+- CUDA 12 (`server-cuda12`): `sm_50`, `sm_52`, `sm_53`, `sm_60`, `sm_61`,
+  `sm_62`, `sm_70`, `sm_72`, `sm_75`, `sm_80`, `sm_86`, `sm_87`, `sm_89`, and
+  `sm_90`.
+- CUDA 13 (`server-cuda13`): `sm_75`, `sm_80`, `sm_86`, `sm_87`, `sm_89`, and
+  `sm_90`. CUDA 13 no longer provides the offline compiler support needed for
+  the older `sm_50` through `sm_72` targets, so use the CUDA 12 image for
+  those legacy GPUs.
+
+Blackwell targets (`sm_100`, `sm_103`, `sm_120`, and `sm_121`) are deliberately
+excluded. The workflow builds both variants independently and verifies their
+published GHCR manifests after each build.
 
 ## Usage
 
@@ -89,7 +104,9 @@ You may want to pass in some different `ARGS`, depending on the CUDA environment
 The defaults are:
 
 - `CUDA_VERSION` set to `12.8.1`
-- `CUDA_DOCKER_ARCH` set to the cmake build default, which includes all the supported architectures
+- `CUDA_DOCKER_ARCH` set to `non-blackwell`, which selects the architecture
+  matrix above based on the CUDA major version. An explicit semicolon-separated
+  CMake architecture list can still be supplied for specialized builds.
 
 The resulting images, are essentially the same as the non-CUDA images:
 
